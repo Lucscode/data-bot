@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Data Analyst Bot</title>
+
+  <!-- Fonte profissional -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">DA</div>
+      <div>
+        <div class="title">Data Analyst Bot</div>
+        <div class="subtitle">Análise de CSV e Excel com IA</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>Upload do Dataset</h2>
+      <p class="muted">Envie um arquivo CSV ou Excel para começar.</p>
+
+      <div class="row">
+        <input type="file" id="file" accept=".csv,.xlsx,.xls">
+        <button id="uploadBtn">Enviar</button>
+      </div>
+
+      <div id="datasetInfo" class="info muted">
+        Nenhum dataset carregado.
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Chat de Análise</h2>
+      <p class="muted">Faça perguntas como: <i>“somar valor por posto”</i></p>
+
+      <div id="chat" class="chat"></div>
+
+      <div class="row">
+        <input id="question" placeholder="Digite sua pergunta…" />
+        <button id="askBtn">Perguntar</button>
+      </div>
+
+      <div id="result"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    Projeto demonstrativo • FastAPI + pandas + IA
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
