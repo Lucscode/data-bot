@@ -65,6 +65,12 @@ body {
   border-radius: var(--radius);
   padding: 20px;
   box-shadow: 0 10px 24px rgba(0,0,0,.04);
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px rgba(0,0,0,.06);
 }
 
 .card h2 {
@@ -80,6 +86,7 @@ body {
   display: flex;
   gap: 10px;
   margin-top: 12px;
+  flex-wrap: wrap;
 }
 
 input[type="file"],
@@ -90,6 +97,12 @@ input {
   border-radius: 10px;
   border: 1px solid var(--border);
   font-size: 14px;
+  transition: border .2s ease;
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--primary);
 }
 
 button {
@@ -100,10 +113,17 @@ button {
   padding: 10px 16px;
   font-size: 14px;
   cursor: pointer;
+  transition: background .2s ease, transform .1s ease;
 }
 
 button:hover {
   background: var(--primary-hover);
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .info {
@@ -118,15 +138,46 @@ button:hover {
   border-radius: 12px;
   padding: 12px;
   background: #fafafa;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Scroll bonito */
+.chat::-webkit-scrollbar {
+  width: 6px;
+}
+.chat::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 10px;
 }
 
 .msg {
-  margin-bottom: 10px;
   font-size: 14px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  max-width: 80%;
+  word-wrap: break-word;
 }
 
+/* Mensagens */
 .msg b {
-  font-weight: 600;
+  display: none; /* removemos o "Você:" e "Bot:" visualmente */
+}
+
+.msg:has(b:contains("Você")) {
+  align-self: flex-end;
+}
+
+/* Alternativa simples */
+.msg:nth-child(odd) {
+  background: #e5e7eb;
+  align-self: flex-start;
+}
+
+.msg:nth-child(even) {
+  background: #d1d5db;
+  align-self: flex-end;
 }
 
 table {
@@ -144,6 +195,7 @@ th, td {
 th {
   background: #f9fafb;
   text-align: left;
+  font-weight: 500;
 }
 
 .footer {
@@ -151,4 +203,19 @@ th {
   padding: 24px;
   font-size: 12px;
   color: var(--muted);
+}
+
+/* Responsivo */
+@media (max-width: 600px) {
+  .chat {
+    height: 200px;
+  }
+
+  .row {
+    flex-direction: column;
+  }
+
+  button {
+    width: 100%;
+  }
 }

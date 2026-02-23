@@ -15,59 +15,59 @@ Regras:
 - Para agregações tipo "somar por", "média por", use groupby_agg com group, value, agg.
 """
 
-# Palavras comuns para tentar achar colunas "de valor"
 VALUE_HINTS = [
     "valor", "total", "amount", "price", "preco", "preço",
     "custo", "cost", "gasto", "receita", "revenue", "salario", "salário",
     "quantidade", "qtd", "litros", "horas", "tempo"
 ]
 
-# Colunas que geralmente são boas para agrupar
 GROUP_HINTS = [
     "categoria", "tipo", "posto", "loja", "cliente", "motorista",
     "veiculo", "veículo", "produto", "setor", "departamento", "mes", "mês", "ano"
 ]
 
 def _norm(s: str) -> str:
-    return s.strip().lower()
+    return (s or "").strip().lower()
+
+def _simplify(s: str) -> str:
+    # remove múltiplos espaços e deixa minúsculo
+    return re.sub(r"\s+", " ", _norm(s))
 
 def _find_column_by_mention(question: str, columns: list[str]) -> str | None:
     """
-    Se o usuário mencionar explicitamente uma coluna (ou parte do nome),
-    tentamos casar com alguma coluna.
+    Tenta casar menção de coluna com base em substring e palavra inteira.
+    Ex: pergunta menciona 'valor total' e coluna é 'Valor_Total' ou 'valor total'.
     """
-    q = _norm(question)
+    q = _simplify(question)
+
+    # tenta match por forma simplificada
     for c in columns:
-        c_norm = _norm(c)
-        # match por palavra inteira ou substring razoável
-        if c_norm in q or re.search(rf"\b{re.escape(c_norm)}\b", q):
+        c_simple = _simplify(c)
+        if not c_simple:
+            continue
+        if c_simple in q:
             return c
+        # palavra inteira (evita match parcial estranho)
+        if re.search(rf"\b{re.escape(c_simple)}\b", q):
+            return c
+
     return None
 
 def _pick_best_value_column(columns: list[str]) -> str | None:
-    cols = list(columns)
-    # 1) preferir colunas com pistas de valor
     for hint in VALUE_HINTS:
-        for c in cols:
+        for c in columns:
             if hint in _norm(c):
                 return c
-    # 2) fallback: nenhuma pista → não arriscar
     return None
 
 def _pick_best_group_column(columns: list[str]) -> str:
-    cols = list(columns)
-    # 1) preferir colunas com pistas de grupo
     for hint in GROUP_HINTS:
-        for c in cols:
+        for c in columns:
             if hint in _norm(c):
                 return c
-    # 2) fallback: primeira coluna
-    return cols[0] if cols else "coluna"
+    return columns[0] if columns else "coluna"
 
 def _extract_top_n(question: str) -> int:
-    """
-    Pega o primeiro número da pergunta, ex: "top 5"
-    """
     m = re.search(r"\b(\d{1,3})\b", question)
     if not m:
         return 10
@@ -80,8 +80,7 @@ def route_without_llm(question: str, columns: list[str]) -> dict:
     if not columns:
         return {"tool": "profile", "args": {}, "explanation": "Dataset sem colunas para analisar."}
 
-    # --- 1) TOP / MAIS FREQUENTES ---
-    # (não use "mais" sozinho; muito genérico)
+    # TOP
     if "top" in q or "mais frequente" in q or "mais comuns" in q or "mais comum" in q:
         n = _extract_top_n(question)
         col = _find_column_by_mention(question, columns) or _pick_best_group_column(columns)
@@ -91,7 +90,7 @@ def route_without_llm(question: str, columns: list[str]) -> dict:
             "explanation": f"Mostrando top {n} valores mais frequentes em '{col}'."
         }
 
-    # --- 2) AGREGAÇÕES (somar/média/máximo/mínimo/contar) ---
+    # AGG
     agg = None
     if "média" in q or "media" in q:
         agg = "mean"
@@ -105,31 +104,24 @@ def route_without_llm(question: str, columns: list[str]) -> dict:
         agg = "count"
 
     if agg:
-        # tenta achar grupo e valor citados
-        group = None
-        value = None
+        group = _pick_best_group_column(columns)
+        mentioned = _find_column_by_mention(question, columns)
 
-        # caso: "por <coluna>"
-        if " por " in q:
-            # tenta pegar algo depois de "por" e casar com coluna
-            mentioned = _find_column_by_mention(question, columns)
-            group = mentioned or _pick_best_group_column(columns)
-        else:
-            group = _pick_best_group_column(columns)
+        # se tiver "por", tentamos tratar a menção como group
+        if " por " in _simplify(question):
+            group = mentioned or group
 
-        # para count, podemos contar a própria coluna do grupo (ou a primeira)
+        # value
         if agg == "count":
-            value = _find_column_by_mention(question, columns) or group
+            # para count, usamos o próprio group como value (tool vai contar)
+            value = group
         else:
-            # value: tenta coluna mencionada; senão tenta pista de valor
-            value = _find_column_by_mention(question, columns) or _pick_best_value_column(columns)
-
-            # se não conseguir achar uma coluna de valor, cai no profile (melhor que errar)
+            value = mentioned or _pick_best_value_column(columns)
             if not value:
                 return {
                     "tool": "profile",
                     "args": {},
-                    "explanation": "Não identifiquei uma coluna numérica/valor para agregar. Mostrando resumo do dataset."
+                    "explanation": "Não identifiquei uma coluna de valor para agregar. Mostrando resumo do dataset."
                 }
 
         return {
@@ -138,19 +130,36 @@ def route_without_llm(question: str, columns: list[str]) -> dict:
             "explanation": f"Aplicando '{agg}' em '{value}' agrupando por '{group}'."
         }
 
-    # --- 3) PERFIL / RESUMO ---
+    # PERFIL
     if "perfil" in q or "resumo" in q or "colunas" in q or "describe" in q:
         return {"tool": "profile", "args": {}, "explanation": "Gerando perfil do dataset."}
 
-    # fallback seguro
     return {"tool": "profile", "args": {}, "explanation": "Pergunta ampla; retornando perfil."}
 
+def _extract_json_from_text(text: str) -> dict | None:
+    """
+    Alguns modelos retornam texto extra. Tentamos extrair o primeiro bloco JSON.
+    """
+    if not text:
+        return None
+    text = text.strip()
+
+    # tenta direto
+    try:
+        return json.loads(text)
+    except Exception:
+        pass
+
+    # tenta achar um objeto {...} no meio
+    m = re.search(r"\{.*\}", text, flags=re.DOTALL)
+    if not m:
+        return None
+    try:
+        return json.loads(m.group(0))
+    except Exception:
+        return None
 
 async def route_with_groq(question: str, columns: list[str]) -> dict:
-    """
-    Se não houver GROQ_API_KEY, usa heurística local.
-    Se houver, chama Groq e tenta parsear JSON; se falhar, cai no fallback.
-    """
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         return route_without_llm(question, columns)
@@ -174,8 +183,8 @@ async def route_with_groq(question: str, columns: list[str]) -> dict:
         r.raise_for_status()
         content = r.json()["choices"][0]["message"]["content"]
 
-    try:
-        return json.loads(content)
-    except json.JSONDecodeError:
-        # fallback seguro se o modelo não mandar JSON puro
+    parsed = _extract_json_from_text(content)
+    if parsed is None:
         return route_without_llm(question, columns)
+
+    return parsed

@@ -1,5 +1,6 @@
-// Troque para sua API no Render quando publicar
-const API_BASE = "http://127.0.0.1:8000";
+// ✅ Coloque aqui a URL do seu backend no Render (sem barra no final)
+// Ex: https://seu-bot-api.onrender.com
+const API_BASE = "https://data-bot-t7tq.onrender.com";
 
 let datasetId = null;
 
@@ -69,6 +70,29 @@ function renderProfile(profile) {
   `;
 }
 
+// --- Helpers de fetch com timeout + parse seguro ---
+async function safeJson(res) {
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    return await res.json().catch(() => ({}));
+  }
+  // Se não for JSON, pega como texto (Render às vezes retorna HTML)
+  const txt = await res.text().catch(() => "");
+  return { detail: txt || `HTTP ${res.status}` };
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 20000) {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 document.getElementById("uploadBtn").addEventListener("click", async () => {
   const fileInput = document.getElementById("file");
   if (!fileInput.files.length) return alert("Selecione um arquivo CSV ou XLSX.");
@@ -81,8 +105,12 @@ document.getElementById("uploadBtn").addEventListener("click", async () => {
   btn.textContent = "Enviando...";
 
   try {
-    const res = await fetch(`${API_BASE}/datasets`, { method: "POST", body: form });
-    const data = await res.json().catch(() => ({}));
+    const res = await fetchWithTimeout(`${API_BASE}/datasets`, {
+      method: "POST",
+      body: form,
+    }, 30000);
+
+    const data = await safeJson(res);
 
     if (!res.ok) {
       addMsg("bot", `Erro no upload: ${data.detail || res.status}`);
@@ -94,7 +122,10 @@ document.getElementById("uploadBtn").addEventListener("click", async () => {
     addMsg("bot", "Dataset carregado! Pode perguntar.");
   } catch (err) {
     console.error(err);
-    addMsg("bot", "Falha de rede/servidor no upload.");
+    addMsg("bot", err.name === "AbortError"
+      ? "Timeout no upload (o servidor demorou para responder)."
+      : "Falha de rede/servidor no upload."
+    );
   } finally {
     btn.disabled = false;
     btn.textContent = "Enviar";
@@ -117,13 +148,13 @@ document.getElementById("askBtn").addEventListener("click", async () => {
   btn.textContent = "Pensando...";
 
   try {
-    const res = await fetch(`${API_BASE}/datasets/${datasetId}/query`, {
+    const res = await fetchWithTimeout(`${API_BASE}/datasets/${datasetId}/query`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question: q }),
-    });
+    }, 25000);
 
-    const data = await res.json().catch(() => ({}));
+    const data = await safeJson(res);
 
     if (!res.ok) {
       addMsg("bot", `Erro: ${data.detail || res.status}`);
@@ -141,7 +172,10 @@ document.getElementById("askBtn").addEventListener("click", async () => {
     }
   } catch (err) {
     console.error(err);
-    addMsg("bot", "Falha de rede/servidor.");
+    addMsg("bot", err.name === "AbortError"
+      ? "Timeout: a API demorou para responder (Render free pode estar acordando)."
+      : "Falha de rede/servidor."
+    );
   } finally {
     btn.disabled = false;
     btn.textContent = "Perguntar";

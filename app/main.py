@@ -1,12 +1,11 @@
-from app.schemas import UploadResponse, QueryRequest, QueryResponse
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.ingest import load_dataframe
-from app.storage import save_df, get_df
-from app.schemas import UploadResponse, QueryRequest, QueryResponse
-from app.analysis_tools import profile_df, top_n, groupby_agg
-from app.ia_router import route_with_groq  # ajuste se seu arquivo for ai_router.py
+from ingest import load_dataframe
+from storage import save_df, get_df
+from schemas import UploadResponse, QueryRequest, QueryResponse
+from analysis_tools import profile_df, top_n, groupby_agg
+from ia_router import route_with_groq  # se seu arquivo for ai_router.py, troque aqui
 
 app = FastAPI(title="Bot de Análise de Dados + IA")
 
@@ -14,10 +13,9 @@ app = FastAPI(title="Bot de Análise de Dados + IA")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://127.0.0.1:5500",
-        "http://localhost:5500",
-        "http://127.0.0.1:5173",
-        "http://localhost:5173",
+        "https://databot1.netlify.app",
+        # depois adicione o domínio do Netlify:
+        # "https://databot1.netlify.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -57,7 +55,6 @@ async def dataset_query(dataset_id: str, req: QueryRequest):
     try:
         if tool == "profile":
             info = profile_df(df)
-            # ✅ profile separado (não vira tabela)
             return {"tool": tool, "explanation": explanation, "table": None, "profile": info}
 
         if tool == "top_n":
