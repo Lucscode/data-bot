@@ -1,11 +1,11 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from ingest import load_dataframe
-from storage import save_df, get_df
-from schemas import UploadResponse, QueryRequest, QueryResponse
-from analysis_tools import profile_df, top_n, groupby_agg
-from ia_router import route_with_groq  # se seu arquivo for ai_router.py, troque aqui
+from app.ingest import load_dataframe
+from app.storage import save_df, get_df
+from app.schemas import UploadResponse, QueryRequest, QueryResponse
+from app.analysis_tools import profile_df, top_n, groupby_agg
+from app.ia_router import route_with_groq  # se seu arquivo for ai_router.py, troque aqui
 
 app = FastAPI(title="Bot de Análise de Dados + IA")
 
